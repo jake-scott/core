@@ -52,7 +52,7 @@ def start_zeroconf_discovery(config: Config):
         name=f"Philips Hue - {config.bridge_id[-6:]}.{zeroconf_type}",
         # SRV target must be a resolvable hostname with an A record, not the
         # service instance name (zeroconf's default when server is omitted).
-        server=f"Philips-hue-{config.bridge_id[-6:]}.local.",
+        server=f"{config.mdns_hostname}.",
         addresses=[socket.inet_aton(config.ip_addr)],
         port=443,
         properties={

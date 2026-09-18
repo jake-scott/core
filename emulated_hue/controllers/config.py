@@ -125,6 +125,11 @@ class Config:
         return self._ip_addr
 
     @property
+    def mdns_hostname(self) -> str:
+        """Return the mDNS hostname (without trailing dot) advertised for the bridge."""
+        return f"Philips-hue-{self.bridge_id[-6:]}.local"
+
+    @property
     def bind_host(self) -> str | None:
         """Return the host the webservers should bind to.
 
