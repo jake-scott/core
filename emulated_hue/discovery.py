@@ -20,14 +20,23 @@ async def async_setup_discovery(config: Config) -> None:
     # https://developers.meethue.com/develop/application-design-guidance/hue-bridge-discovery/
     loop = asyncio.get_running_loop()
 
-    LOGGER.debug("Starting mDNS/uPNP discovery broadcast...")
+    LOGGER.info(
+        "Starting mDNS/uPNP discovery broadcast for bridge %s on %s...",
+        config.bridge_id,
+        config.ip_addr,
+    )
 
     # start ssdp discovery
     upnp_listener = UPNPResponderThread(config)
     upnp_listener.start()
 
     # start mdns/zeroconf discovery
-    loop.run_in_executor(None, start_zeroconf_discovery, config)
+    def _log_zeroconf_result(fut: asyncio.Future) -> None:
+        if exc := fut.exception():
+            LOGGER.error("Failed to start mDNS discovery: %s", exc, exc_info=exc)
+
+    zeroconf_task = loop.run_in_executor(None, start_zeroconf_discovery, config)
+    zeroconf_task.add_done_callback(_log_zeroconf_result)
 
 
 def start_zeroconf_discovery(config: Config):
@@ -49,6 +58,12 @@ def start_zeroconf_discovery(config: Config):
         },
     )
     zeroconf.register_service(info)
+    LOGGER.info(
+        "mDNS discovery active: advertising %s at %s:443 on %s",
+        info.name,
+        config.ip_addr,
+        "all interfaces" if interfaces is InterfaceChoice.All else interfaces,
+    )
 
 
 class UPNPResponderThread(threading.Thread):
@@ -127,10 +142,22 @@ USN: {bridge_uuid}
             socket.inet_aton("239.255.255.250") + socket.inet_aton(self.ip_addr),
         )
 
-        if self.upnp_bind_multicast:
-            ssdp_socket.bind(("", 1900))
-        else:
-            ssdp_socket.bind((self.ip_addr, 1900))
+        try:
+            if self.upnp_bind_multicast:
+                ssdp_socket.bind(("", 1900))
+            else:
+                ssdp_socket.bind((self.ip_addr, 1900))
+        except OSError as err:
+            LOGGER.error(
+                "Failed to start SSDP/uPNP discovery responder on UDP port 1900: %s",
+                err,
+            )
+            clean_socket_close(ssdp_socket)
+            return
+        LOGGER.info(
+            "SSDP/uPNP discovery active: responding to M-SEARCH on UDP 1900 via %s",
+            self.ip_addr,
+        )
 
         while True:
             if self._interrupted:
