@@ -95,10 +95,18 @@ class EntityState(BaseModel):
             return EntityState()
 
         save_state = {}
-        for state in list(vars(cls).get("__fields__")):
+        for state in ALL_STATES:
             if state in save_state:
                 save_state[state] = states[state]
         return EntityState(**save_state)
 
 
-ALL_STATES: list = list(vars(EntityState).get("__fields__"))
+def _model_field_names(model: type[BaseModel]) -> list[str]:
+    """Return the field names of a pydantic model (pydantic v1 and v2)."""
+    fields = getattr(model, "model_fields", None)  # pydantic v2
+    if fields is None:
+        fields = getattr(model, "__fields__", {})  # pydantic v1
+    return list(fields)
+
+
+ALL_STATES: list = _model_field_names(EntityState)
