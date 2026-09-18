@@ -1,6 +1,7 @@
 """Emulated Hue quick start."""
 import argparse
 import asyncio
+import json
 import logging
 import os
 import traceback
@@ -11,6 +12,23 @@ from hass_client.exceptions import CannotConnect
 from emulated_hue import HueEmulator, const
 
 IS_SUPERVISOR = os.path.isfile("/data/options.json") and os.environ.get("HASSIO_TOKEN")
+
+
+def _addon_option(key: str) -> str | None:
+    """Read a single option from the Supervisor add-on options file.
+
+    Options are normally exported as environment variables by the add-on's
+    init scripts, but this fallback lets newly added options work even when
+    running on an older container image whose init scripts don't know them.
+    """
+    if not IS_SUPERVISOR:
+        return None
+    try:
+        with open("/data/options.json", encoding="utf-8") as fp:
+            value = json.load(fp).get(key)
+    except (OSError, ValueError):
+        return None
+    return str(value).strip() if value not in (None, "") else None
 
 # pylint: disable=invalid-name
 if __name__ == "__main__":
@@ -68,6 +86,14 @@ if __name__ == "__main__":
         default=os.getenv("HTTPS_PORT", const.HUE_HTTPS_PORT),
     )
     parser.add_argument(
+        "--listen-ip",
+        type=str,
+        help="IPv4 address to bind the HTTP/HTTPS servers to and to advertise "
+        "during discovery. Defaults to auto-detection (the interface with the "
+        "default route). Use this on multi-homed hosts (VLANs, VPNs, docker bridges).",
+        default=os.getenv("LISTEN_IP") or _addon_option("listen_ip"),
+    )
+    parser.add_argument(
         "--use-default-ports-for-discovery",
         action="store_true",
         help=f"Always use HTTP port {const.HUE_HTTP_PORT} and HTTPS port {const.HUE_HTTPS_PORT} for discovery "
@@ -89,8 +115,16 @@ if __name__ == "__main__":
     # turn down logging for hass-client
     logging.getLogger("hass_client").setLevel(logging.INFO)
 
+    listen_ip = (args.listen_ip or "").strip() or None
+
     hue = HueEmulator(
-        datapath, url, token, args.http_port, args.https_port, use_default_ports
+        datapath,
+        url,
+        token,
+        args.http_port,
+        args.https_port,
+        use_default_ports,
+        listen_ip,
     )
 
     def on_shutdown(loop):
