@@ -50,6 +50,9 @@ def start_zeroconf_discovery(config: Config):
     info = ServiceInfo(
         zeroconf_type,
         name=f"Philips Hue - {config.bridge_id[-6:]}.{zeroconf_type}",
+        # SRV target must be a resolvable hostname with an A record, not the
+        # service instance name (zeroconf's default when server is omitted).
+        server=f"Philips-hue-{config.bridge_id[-6:]}.local.",
         addresses=[socket.inet_aton(config.ip_addr)],
         port=443,
         properties={
@@ -59,8 +62,9 @@ def start_zeroconf_discovery(config: Config):
     )
     zeroconf.register_service(info)
     LOGGER.info(
-        "mDNS discovery active: advertising %s at %s:443 on %s",
+        "mDNS discovery active: advertising %s -> %s (%s:443) on %s",
         info.name,
+        info.server,
         config.ip_addr,
         "all interfaces" if interfaces is InterfaceChoice.All else interfaces,
     )
