@@ -43,17 +43,22 @@ class HueWeb:
         await self.runner.setup()
 
         # Create and start the HTTP webserver/api
+        bind_host = self.ctl.config_instance.bind_host
+        bind_host_str = bind_host or "0.0.0.0"
         self.http_site = web.TCPSite(
-            self.runner, port=self.ctl.config_instance.http_port
+            self.runner, host=bind_host, port=self.ctl.config_instance.http_port
         )
         try:
             await self.http_site.start()
             LOGGER.info(
-                "Started HTTP webserver on port %s", self.ctl.config_instance.http_port
+                "Started HTTP webserver on %s:%s",
+                bind_host_str,
+                self.ctl.config_instance.http_port,
             )
         except OSError as error:
             LOGGER.error(
-                "Failed to create HTTP server at port %d: %s",
+                "Failed to create HTTP server at %s:%d: %s",
+                bind_host_str,
                 self.ctl.config_instance.http_port,
                 error,
             )
@@ -71,18 +76,21 @@ class HueWeb:
         # Create and start the HTTPS webserver/API
         self.https_site = web.TCPSite(
             self.runner,
+            host=bind_host,
             port=self.ctl.config_instance.https_port,
             ssl_context=ssl_context,
         )
         try:
             await self.https_site.start()
             LOGGER.info(
-                "Started HTTPS webserver on port %s",
+                "Started HTTPS webserver on %s:%s",
+                bind_host_str,
                 self.ctl.config_instance.https_port,
             )
         except OSError as error:
             LOGGER.error(
-                "Failed to create HTTPS server at port %d: %s",
+                "Failed to create HTTPS server at %s:%d: %s",
+                bind_host_str,
                 self.ctl.config_instance.https_port,
                 error,
             )

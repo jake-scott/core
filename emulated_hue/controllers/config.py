@@ -2,6 +2,7 @@
 import asyncio
 import datetime
 import hashlib
+import ipaddress
 import logging
 import os
 from pathlib import Path
@@ -39,6 +40,7 @@ class Config:
         http_port: int,
         https_port: int,
         use_default_ports: bool,
+        listen_ip: str | None = None,
     ):
         """Initialize the instance."""
         self.ctl = ctl
@@ -50,9 +52,21 @@ class Config:
         self._link_mode_enabled = False
         self._link_mode_discovery_key = None
 
-        # Get the IP address that will be passed to during discovery
-        self._ip_addr = get_local_ip()
-        LOGGER.info("Auto detected listen IP address is %s", self.ip_addr)
+        # Get the IP address that the webservers bind to and that is
+        # advertised during discovery. Either explicitly configured or auto detected.
+        self._listen_ip_configured = bool(listen_ip)
+        if listen_ip:
+            try:
+                ipaddress.IPv4Address(listen_ip)
+            except ipaddress.AddressValueError as err:
+                raise ValueError(
+                    f"Invalid listen IP address '{listen_ip}': {err}"
+                ) from err
+            self._ip_addr = listen_ip
+            LOGGER.info("Using configured listen IP address %s", self.ip_addr)
+        else:
+            self._ip_addr = get_local_ip()
+            LOGGER.info("Auto detected listen IP address is %s", self.ip_addr)
 
         # Get the ports that the Hue bridge will listen on
         # ports can be overridden but Hue apps expect ports 80/443
@@ -109,6 +123,15 @@ class Config:
     def ip_addr(self) -> str:
         """Return ip address of the emulated bridge."""
         return self._ip_addr
+
+    @property
+    def bind_host(self) -> str | None:
+        """Return the host the webservers should bind to.
+
+        Returns the configured listen IP, or None (bind to all interfaces)
+        when the IP address was auto detected, preserving previous behaviour.
+        """
+        return self._ip_addr if self._listen_ip_configured else None
 
     @property
     def mac_addr(self) -> str:

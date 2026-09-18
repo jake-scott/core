@@ -28,6 +28,10 @@ if bashio::fs.file_exists '/data/options.json'; then
       echo $(bashio::config 'url') > /run/s6/container_environment/HASS_URL
   fi
 
+  if bashio::config.has_value 'listen_ip'; then
+      echo $(bashio::config 'listen_ip') > /run/s6/container_environment/LISTEN_IP
+  fi
+
   if bashio::config.has_value 'use_default_ports_for_discovery'; then
       echo $(bashio::config 'use_default_ports_for_discovery') > /run/s6/container_environment/USE_DEFAULT_PORTS
   fi

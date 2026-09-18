@@ -11,8 +11,6 @@ from zeroconf import InterfaceChoice, ServiceInfo, Zeroconf
 from emulated_hue import const
 from emulated_hue.controllers.config import Config
 
-from .utils import get_ip_pton
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -33,13 +31,16 @@ async def async_setup_discovery(config: Config) -> None:
 
 def start_zeroconf_discovery(config: Config):
     """Start zeroconf discovery."""
-    zeroconf = Zeroconf(interfaces=InterfaceChoice.All)
+    # When a listen IP is explicitly configured, only answer mDNS queries on
+    # that interface. Otherwise keep the previous behaviour (all interfaces).
+    interfaces = [config.ip_addr] if config.bind_host else InterfaceChoice.All
+    zeroconf = Zeroconf(interfaces=interfaces)
     zeroconf_type = "_hue._tcp.local."
 
     info = ServiceInfo(
         zeroconf_type,
         name=f"Philips Hue - {config.bridge_id[-6:]}.{zeroconf_type}",
-        addresses=[get_ip_pton()],
+        addresses=[socket.inet_aton(config.ip_addr)],
         port=443,
         properties={
             "bridgeid": config.bridge_id,
